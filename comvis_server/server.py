@@ -24,8 +24,11 @@ def f_3(x):
 def f_4(x):
     return -0.96 + 0.96 / (1.09 - x[:, 1]**2)
 
+# def f_5(x):
+    # return -0.96 + 0.96 / (1.09 - x[:, 1]**2)
+
 def f_5(x):
-    return -0.96 + 0.96 / (1.09 - x[:, 1]**2)
+    return np.max([np.abs(x[:, 0] - 0.65), np.abs(x[:, 1] - 0.65)], axis=0)
 
 f1 = _ScalarObjective(name="f1", evaluator=f_1)
 f2 = _ScalarObjective(name="f2", evaluator=f_2)
@@ -41,9 +44,9 @@ varsl = variable_builder(["x_1", "x_2"],
 
 problem = MOProblem(variables=varsl, objectives=[f1, f2, f3, f4, f5])
 
-evolver = RVEA(problem, interact=True, n_iterations=10, population_size=15, n_gen_per_iter=200)
+evolver = RVEA(problem, interact=True, n_iterations=10, lattice_resolution=3)
 
-_, pref = evolver.requests()
+_, pref = evolver.iterate()
 
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 sock.bind(("10.0.2.15", 5005))
@@ -56,33 +59,46 @@ print("Connection estabilished!")
 
 while True:
     try:
-        data = connection.recv(1024)
+        data = connection.recv(2048)
         print(f"Recieved: {data}")
 
         if not data:
-            break
+            print("Connection lost!")
+            # reset the evolver
+            evolver = RVEA(problem, interact=True, n_iterations=10, lattice_resolution=3)
+            _, pref = evolver.iterate()
+            connection.close()
 
-        # do stuff with data
-        d = parse_message(data.decode('utf-8'))
+            sock.listen(1)
+            print("Waiting for ComVis to connect...")
+            connection, client_addr = sock.accept()
+            print("Connection estabilished!")
 
-        ref_point = np.squeeze(eval(d["DATA"]))
+        else:
+            # do stuff with data
+            d = parse_message(data.decode('utf-8'))
+            print(f"Parsed message: {d}")
 
-        pref.response = pd.DataFrame(np.atleast_2d(ref_point), columns=pref.content['dimensions_data'].columns)
-        plot, pref = evolver.iterate(pref)
-        objectives = evolver.population.objectives
+            ref_point = np.squeeze(eval(d["DATA"]))
 
-        print(f"ref_point: {ref_point}")
+            print(f"Ref point: {ref_point}")
 
-        # send response
-        d["DATA"] = np.array_str(objectives[:15]).replace('\n', ',')
+            pref.response = pd.DataFrame(np.atleast_2d(ref_point), columns=pref.content['dimensions_data'].columns)
+            _, pref = evolver.iterate(pref)
+            objectives = evolver.population.objectives
 
-        data = parse_dict(d).encode('utf-8')
+            print(f"Computed objective vectors: {objectives}")
 
-        connection.send(data)
+            # send response
+            d["DATA"] = np.array_str(objectives).replace('\n', ',')
+
+            data = parse_dict(d).encode('utf-8')
+            
+            print(f"Sending data: {data}")
+
+            connection.send(data)
 
     except:
         # make sure to close the connection in case of errors
         connection.close()
-    
 
-connection.close()
