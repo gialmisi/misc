@@ -90,7 +90,7 @@ while True:
             print(f"Computed objective vectors: {objectives}")
 
             # send response
-            d["DATA"] = np.array_str(objectives).replace('\n', ',')
+            d["DATA"] = np.array2string(objectives, separator=',').replace('\n', '')
 
             data = parse_dict(d).encode('utf-8')
             
