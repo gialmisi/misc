@@ -13,16 +13,20 @@ import pandas as pd
 
 # create the problem
 def f_1(x):
-    return -4.07 - 2.27 * x[:, 0]
+    res = 4.07 + 2.27 * x[:, 0]
+    return -res
 
 def f_2(x):
-    return -2.60 - 0.03*x[:, 0] - 0.02*x[:, 1] - 0.01 / (1.39 - x[:, 0]**2) - 0.30 / (1.39 - x[:, 1]**2)
+    res = 2.60 + 0.03*x[:, 0] + 0.02*x[:, 1] + 0.01 / (1.39 - x[:, 0]**2) + 0.30 / (1.39 - x[:, 1]**2)
+    return -res
 
 def f_3(x):
-    return -8.21 + 0.71 / (1.09 - x[:, 0]**2)
+    res = 8.21 - 0.71 / (1.09 - x[:, 0]**2)
+    return -res
 
 def f_4(x):
-    return -0.96 + 0.96 / (1.09 - x[:, 1]**2)
+    res = 0.96 - 0.96 / (1.09 - x[:, 1]**2)
+    return -res
 
 # def f_5(x):
     # return -0.96 + 0.96 / (1.09 - x[:, 1]**2)
@@ -44,7 +48,7 @@ varsl = variable_builder(["x_1", "x_2"],
 
 problem = MOProblem(variables=varsl, objectives=[f1, f2, f3, f4, f5])
 
-evolver = RVEA(problem, interact=True, n_iterations=10, lattice_resolution=3)
+evolver = RVEA(problem, interact=True, n_iterations=10, n_gen_per_iter=100)
 
 _, pref = evolver.iterate()
 
@@ -65,7 +69,7 @@ while True:
         if not data:
             print("Connection lost!")
             # reset the evolver
-            evolver = RVEA(problem, interact=True, n_iterations=10, lattice_resolution=3)
+            evolver = RVEA(problem, interact=True, n_iterations=10, n_gen_per_iter=100)
             _, pref = evolver.iterate()
             connection.close()
 
@@ -91,6 +95,8 @@ while True:
 
             # send response
             d["DATA"] = np.array2string(objectives, separator=',').replace('\n', '')
+            d["BOUNDS"] = np.array2string(np.array([[-6.4, -3.40, -7.5, 5.21e-5, -0.018],
+                [6.4, 3.40, 7.5, -5.21e-5, 0.018]]), separator=',').replace('\n', '')
 
             data = parse_dict(d).encode('utf-8')
             
