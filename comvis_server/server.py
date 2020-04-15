@@ -98,23 +98,35 @@ while True:
             d = parse_message(data.decode("utf-8"))
             print(f"Parsed message: {d}")
 
-            ref_point = np.squeeze(eval(d["DATA"]))
-
-            print(f"Ref point: {ref_point}")
-
-            pref.response = pd.DataFrame(
-                np.atleast_2d(ref_point),
-                columns=pref.content["dimensions_data"].columns,
-            )
-            _, pref = evolver.iterate(pref)
+            if d["DATA"] == "":
+                # No preference is sent. Sending current data back.
+                color_point = evolver.population.ideal_objective_vector
+            else:
+                # Preference sent. Run one iteration of evolver
+                ref_point = np.squeeze(eval(d["DATA"]))
+                print(f"Ref point: {ref_point}")
+                pref.response = pd.DataFrame(
+                    np.atleast_2d(ref_point),
+                    columns=pref.content["dimensions_data"].columns,
+                )
+                color_point = pref.response.values
+                _, pref = evolver.iterate(pref)
             objectives = evolver.population.objectives
-
+            color_data = color_solutions(
+                            objectives,
+                            ref_point=color_point,
+                            ideal=evolver.population.ideal_objective_vector,
+                        ).values()
+            obj_with_col = np.hstack((objectives, color_data))
             print(f"Computed objective vectors: {objectives}")
 
             # send response
-            d["DATA"] = np.array2string(objectives, separator=",").replace("\n", "")
+            d["DATA"] = np.array2string(obj_with_col, separator=",").replace("\n", "")
             # NOTE ideal = evolver.population.ideal_objective_vector.
             # Finding nadir is complicated though.
+            
+            # NOTE Uncomment the following when it is supported
+            """
             d["BOUNDS"] = np.array2string(
                 np.array(
                     [
@@ -124,8 +136,6 @@ while True:
                 ),
                 separator=",",
             ).replace("\n", "")
-            # NOTE Uncomment the following when it is supported
-            """
             data["OBJECTIVE-NAMES"] = np.array2string(
                 problem.get_objective_names(), separator=","
             ).replace("\n", "")

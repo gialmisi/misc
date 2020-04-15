@@ -1,0 +1,99 @@
+
+ComVis and DESDEO will be communicating with plain ASCII strings sent
+via the TCP/IP protocol.  Available symbols and their meaning:
+
+-------------------------------------------------------------------------------------------------------------------------
+symbol          meaning                                     associated value type     example                           
+-------------------------------------------------------------------------------------------------------------------------
+OK              No errors                                   None                      OK_...                            
+ERR             An error has occured                        None                      ERR_...                           
+DATA            A 2 dimensional array of values follows     List(List(float))         See notes below the table         
+MSG             An array of strings follows                 List(string)              ["Not enough points genereated."] 
+OBJECTIVE-NAMES Array of names of objectives follows        List(string)              ["f1", "f2", "f3"]
+COLOR           A 2 dimensional array of values follows     List(List(float))         See notes below
+COLOR-NAMES     Array of names of coloring method follows   List(string)              ["L1 dist from ideal", "Cluster id"]
+END             End of message                              None                      ..._END                           
+_               Delimiter                                   None                      OK_MSG_...                        
+,               List member delimiter                       None                      [a, b]; [ [a, b], [c, d] ]        
+[]              List container                              None                      See example for `,`               
+-------------------------------------------------------------------------------------------------------------------------
+
+Each message will always start with either the `OK` of `ERR` symbols,
+and end with the `END` symbol. The delimiter used is the underscore
+`_`.
+
+A list of tuples, which consist of floats, will follow the `DATA` symbol.
+Each tuple represents the set of objective values associated with a single solution.
+The number of tuples in the parent list is the same as the number of solutions.
+
+A list of strings will follow the "OBJECTIVE-NAMES" symbol.
+Each string represents the objective name. The order of the strings is the same as the
+order of the objective values in a single tuple in the list which follows "DATA".
+
+A list of strings will follow the "COLOR-NAMES" symbol.
+Each string represents a solution coloring technique.
+
+A list of tuples, which consist of floats, will follow the `COLOR` symbol.
+Each tuple represents the set of alternative color values associated with a single
+solution. These values were generated using the techniques described in the list of
+strings that follows "COLOR-NAMES". The order of color values in the tuple is same as
+the order of the strings in the list that follows "COLOR-NAMES".
+Only one of these values is to be used for colouring the solutions at any given time.
+The number of tuples in the parent list is the same as the number of solutions.
+
+The symbol `MSG` will be followed by a list of strings, which should
+be displayed to the decision maker on the ComVis end, or to the
+analyst on the DESDEO end. Based on the latest discussion, the latter
+is not needed, for now.
+
+Each symbol will always be followed by the delimiter `_`, apart from
+`END`, which will never be followed by the delimier, and the delimiter
+itself.
+
+If applicable, the delimiter following a symbol will be followed by an
+associated value, which in turn, will be followed by a delimiter
+again. If no value type is associated to a symbol, meaning its' type
+is None in the above table, the delimiter following the symbol should
+be followed by another symbol.
+
+The elements inside the lists following `DATA` and `MSG`, will be
+delimited by a comma `,`.
+
+In general, white space is ignored outside of strings in the list
+following `MSG`.
+
+
+2.1 Examples of messages
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+2.1.1 From RVEA
+---------------
+
+Sending a bunch of computed points to ComVis:
+`OK_DATA_[(0.5 ,0.2 ,0.1 ), (0.22,0.29,0.66), (0.53,0.94,0.64), (0.46,0.96,0.88), (0.14,0.29,0.48)]_END`
+
+In this example, number of objectives = 3, number of solutions = 5
+
+
+The above is currently supported by Comvis. New message format proposal:
+
+
+Sending a bunch of computed points with additional information to ComVis:
+`OK_DATA_[(0.5 ,0.2 ,0.1 ), (0.22,0.29,0.66), (0.53,0.94,0.64), (0.46,0.96,0.88), (0.14,0.29,0.48)]_
+OBJECTIVE-NAMES_["Name for the first objective", "second objective name", "the name for the last objective"]_
+COLOR_[(0.9 ,1), (0.02,2), (1.3 ,1), (0.94,1), (0.52,2 )]_
+COLOR-NAMES["L1 distance from ideal point", "Cluster id"]_END`
+
+In this example, number of objectives = 3, number of solutions = 5, number of coloring techniques = 2
+The user should be able to choose the coloring mechanism from Comvis using the list COLOR-NAMES.
+
+Note: Color "values" can either be floats or integers. The floats are NOT normalized between 0 and 1.
+
+
+
+RVEA is not able to compute enough points:
+`OK_DATA_[ [...] ]_MSG_["Only N new points computed."]_END`
+
+
+RVEA is unhappy with the reference:
+`ERR_MSG_["Invalid reference point given!"]_END`
