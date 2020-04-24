@@ -111,17 +111,18 @@ while True:
                 )
                 color_point = pref.response.values
                 _, pref = evolver.iterate(pref)
+            variables = evolver.population.individuals
             objectives = evolver.population.objectives
             color_data = color_solutions(
                             objectives,
                             ref_point=color_point,
                             ideal=evolver.population.ideal_objective_vector,
-                        ).values()
-            obj_with_col = np.hstack((objectives, color_data))
-            print(f"Computed objective vectors: {objectives}")
+                        )
+            obj_with_col_and_var = np.hstack((objectives, color_data, variables))
+            print(f"Computed rows: {obj_with_col_and_var}")
 
             # send response
-            d["DATA"] = np.array2string(obj_with_col, separator=",").replace("\n", "")
+            d["DATA"] = np.array2string(obj_with_col_and_var, separator=",").replace("\n", "")
             # NOTE ideal = evolver.population.ideal_objective_vector.
             # Finding nadir is complicated though.
             
