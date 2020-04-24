@@ -14,11 +14,13 @@ import pandas as pd
 
 # create the problem
 def f_1(x):
+    # max
     res = 4.07 + 2.27 * x[:, 0]
-    return -res
+    return res
 
 
 def f_2(x):
+    # max
     res = (
         2.60
         + 0.03 * x[:, 0]
@@ -26,17 +28,19 @@ def f_2(x):
         + 0.01 / (1.39 - x[:, 0] ** 2)
         + 0.30 / (1.39 - x[:, 1] ** 2)
     )
-    return -res
+    return res
 
 
 def f_3(x):
+    # max
     res = 8.21 - 0.71 / (1.09 - x[:, 0] ** 2)
-    return -res
+    return res
 
 
 def f_4(x):
-    res = 0.96 - 0.96 / (1.09 - x[:, 1] ** 2)
-    return -res
+    # min
+    res = - 0.96 + 0.96 / (1.09 - x[:, 1] ** 2)
+    return res 
 
 
 # def f_5(x):
@@ -44,12 +48,13 @@ def f_4(x):
 
 
 def f_5(x):
+    # min
     return np.max([np.abs(x[:, 0] - 0.65), np.abs(x[:, 1] - 0.65)], axis=0)
 
 
-f1 = _ScalarObjective(name="f1", evaluator=f_1)
-f2 = _ScalarObjective(name="f2", evaluator=f_2)
-f3 = _ScalarObjective(name="f3", evaluator=f_3)
+f1 = _ScalarObjective(name="f1", evaluator=f_1, maximize=[True])
+f2 = _ScalarObjective(name="f2", evaluator=f_2, maximize=[True])
+f3 = _ScalarObjective(name="f3", evaluator=f_3, maximize=[True])
 f4 = _ScalarObjective(name="f4", evaluator=f_4)
 f5 = _ScalarObjective(name="f5", evaluator=f_5)
 
@@ -119,10 +124,12 @@ while True:
                             ideal=evolver.population.ideal_objective_vector,
                         )
             obj_with_col_and_var = np.hstack((objectives, color_data, variables))
-            print(f"Computed rows: {obj_with_col_and_var}")
+            # print(f"Computed rows: {obj_with_col_and_var}")
 
             # send response
-            d["DATA"] = np.array2string(obj_with_col_and_var, separator=",").replace("\n", "")
+            d["DATA"] = np.array2string(obj_with_col_and_var, separator=",").replace("\n", "").replace(" ", "")
+            #d["DATA"] = np.array2string(objectives, separator=",").replace("\n", "").replace(" ", "")
+            print(d["DATA"])
             # NOTE ideal = evolver.population.ideal_objective_vector.
             # Finding nadir is complicated though.
             
