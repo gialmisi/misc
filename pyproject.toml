@@ -7,6 +7,7 @@ authors = ["Your Name <you@example.com>"]
 [tool.poetry.dependencies]
 python = "^3.7"
 desdeo_emo = "^0.7.0"
+sklearn = "^0.0"
 
 [tool.poetry.dev-dependencies]
 

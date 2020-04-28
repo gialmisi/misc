@@ -1,16 +1,19 @@
 import socket
 import sys
 
+import numpy as np
+import pandas as pd
+from desdeo_emo.EAs.RVEA import RVEA
+from desdeo_problem.Objective import _ScalarObjective
+from desdeo_problem.Problem import MOProblem
+from desdeo_problem.Variable import variable_builder
+from sklearn.cluster import KMeans
+from sklearn.metrics import pairwise_distances_argmin_min
+
 from myparser import parse_dict, parse_message
 from solution_color import color_solutions
 
-from desdeo_emo.EAs.RVEA import RVEA
-from desdeo_problem.Variable import variable_builder
-from desdeo_problem.Objective import _ScalarObjective
-from desdeo_problem.Problem import MOProblem
-
-import numpy as np
-import pandas as pd
+n_clusters = 10
 
 # create the problem
 def f_1(x):
@@ -21,13 +24,7 @@ def f_1(x):
 
 def f_2(x):
     # max
-    res = (
-        2.60
-        + 0.03 * x[:, 0]
-        + 0.02 * x[:, 1]
-        + 0.01 / (1.39 - x[:, 0] ** 2)
-        + 0.30 / (1.39 - x[:, 1] ** 2)
-    )
+    res = 2.60 + 0.03 * x[:, 0] + 0.02 * x[:, 1] + 0.01 / (1.39 - x[:, 0] ** 2) + 0.30 / (1.39 - x[:, 1] ** 2)
     return res
 
 
@@ -39,8 +36,8 @@ def f_3(x):
 
 def f_4(x):
     # min
-    res = - 0.96 + 0.96 / (1.09 - x[:, 1] ** 2)
-    return res 
+    res = -0.96 + 0.96 / (1.09 - x[:, 1] ** 2)
+    return res
 
 
 # def f_5(x):
@@ -58,18 +55,14 @@ f3 = _ScalarObjective(name="f3", evaluator=f_3, maximize=[True])
 f4 = _ScalarObjective(name="f4", evaluator=f_4)
 f5 = _ScalarObjective(name="f5", evaluator=f_5)
 
-varsl = variable_builder(
-    ["x_1", "x_2"],
-    initial_values=[0.5, 0.5],
-    lower_bounds=[0.3, 0.3],
-    upper_bounds=[1.0, 1.0],
-)
+varsl = variable_builder(["x_1", "x_2"], initial_values=[0.5, 0.5], lower_bounds=[0.3, 0.3], upper_bounds=[1.0, 1.0],)
 
 problem = MOProblem(variables=varsl, objectives=[f1, f2, f3, f4, f5])
 
 evolver = RVEA(problem, interact=True, n_iterations=10, n_gen_per_iter=100)
 
 _, pref = evolver.iterate()
+n_iteration = 1
 
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 sock.bind(("10.0.2.15", 5005))
@@ -91,6 +84,7 @@ while True:
             # reset the evolver
             evolver = RVEA(problem, interact=True, n_iterations=10, n_gen_per_iter=100)
             _, pref = evolver.iterate()
+            n_iteration = 1
             connection.close()
 
             sock.listen(1)
@@ -110,63 +104,39 @@ while True:
                 # Preference sent. Run one iteration of evolver
                 ref_point = np.squeeze(eval(d["DATA"]))
                 print(f"Ref point: {ref_point}")
-                pref.response = pd.DataFrame(
-                    np.atleast_2d(ref_point),
-                    columns=pref.content["dimensions_data"].columns,
-                )
+                pref.response = pd.DataFrame(np.atleast_2d(ref_point), columns=pref.content["dimensions_data"].columns,)
                 color_point = pref.response.values
                 _, pref = evolver.iterate(pref)
-            variables = evolver.population.individuals
-            objectives = evolver.population.objectives
+
+            objectives_ = evolver.population.objectives
+            # fit to n_clusters and find the closest solutions to each cluster's centroid
+            kmeans = KMeans(n_clusters=n_clusters)
+            kmeans.fit(objectives_)
+            closest, _ = pairwise_distances_argmin_min(kmeans.cluster_centers_, objectives_)
+            objectives = objectives_[closest]
+            variables = evolver.population.individuals[closest]
+
             color_data = color_solutions(
-                            objectives,
-                            ref_point=color_point,
-                            ideal=evolver.population.ideal_objective_vector,
-                        )
-            obj_with_col_and_var = np.hstack((objectives, color_data, variables))
+                objectives, ref_point=color_point, ideal=evolver.population.ideal_objective_vector,
+            )
+            obj_with_col_and_var = np.hstack(
+                (objectives, color_data, variables, np.repeat(np.atleast_2d(n_iteration), len(objectives), axis=0))
+            )
             # print(f"Computed rows: {obj_with_col_and_var}")
 
             # send response
             d["DATA"] = np.array2string(obj_with_col_and_var, separator=",").replace("\n", "").replace(" ", "")
-            #d["DATA"] = np.array2string(objectives, separator=",").replace("\n", "").replace(" ", "")
+            # d["DATA"] = np.array2string(objectives, separator=",").replace("\n", "").replace(" ", "")
             print(d["DATA"])
-            # NOTE ideal = evolver.population.ideal_objective_vector.
-            # Finding nadir is complicated though.
-            
-            # NOTE Uncomment the following when it is supported
-            """
-            d["BOUNDS"] = np.array2string(
-                np.array(
-                    [
-                        [-6.4, -3.40, -7.5, 5.21e-5, -0.018],
-                        [6.4, 3.40, 7.5, -5.21e-5, 0.018],
-                    ]
-                ),
-                separator=",",
-            ).replace("\n", "")
-            data["OBJECTIVE-NAMES"] = np.array2string(
-                problem.get_objective_names(), separator=","
-            ).replace("\n", "")
-            color_data = color_solutions(
-                objectives,
-                ref_point=ref_point,
-                ideal=evolver.population.ideal_objective_vector,
-            )
-            data["COLOR"] = np.array2string(color_data.values, separator=",").replace(
-                "\n", ""
-            )
-            data["COLOR-NAMES"] = np.array2string(
-                color_data.columns, separator=","
-            ).replace("\n", "")
-            """
 
             data = parse_dict(d).encode("utf-8")
 
             print(f"Sending data: {data}")
 
             connection.send(data)
+            n_iteration += 1
 
-    except:
+    except Exception as e:
         # make sure to close the connection in case of errors
+        print(e)
         connection.close()
-
