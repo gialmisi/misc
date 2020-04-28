@@ -125,7 +125,17 @@ while True:
             # print(f"Computed rows: {obj_with_col_and_var}")
 
             # send response
-            d["DATA"] = np.array2string(obj_with_col_and_var, separator=",").replace("\n", "").replace(" ", "")
+
+            d["DATA"] = (
+                np.array2string(
+                    obj_with_col_and_var,
+                    separator=",",
+                    formatter={"all": lambda x: str(int(x)) if x.is_integer() else "{:.6f}".format(x)},
+                )
+                .replace("\n", "")
+                .replace(" ", "")
+            )
+            # d["DATA"] = np.array2string(obj_with_col_and_var, separator=",").replace("\n", "").replace(" ", "")
             # d["DATA"] = np.array2string(objectives, separator=",").replace("\n", "").replace(" ", "")
             print(d["DATA"])
 
