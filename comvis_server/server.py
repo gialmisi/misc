@@ -7,13 +7,14 @@ from desdeo_emo.EAs.RVEA import RVEA
 from desdeo_problem.Objective import _ScalarObjective
 from desdeo_problem.Problem import MOProblem
 from desdeo_problem.Variable import variable_builder
-from sklearn.cluster import KMeans
+from sklearn.cluster import DBSCAN, KMeans
 from sklearn.metrics import pairwise_distances_argmin_min
+from sklearn.mixture import GaussianMixture
 
 from myparser import parse_dict, parse_message
 from solution_color import color_solutions
 
-n_clusters = 10
+n_clusters = 5
 
 # create the problem
 def f_1(x):
@@ -109,12 +110,45 @@ while True:
                 _, pref = evolver.iterate(pref)
 
             objectives_ = evolver.population.objectives
+
+            ### KMEANS
             # fit to n_clusters and find the closest solutions to each cluster's centroid
-            kmeans = KMeans(n_clusters=n_clusters)
+            kmeans = KMeans(n_clusters=n_clusters, verbose=0)
             kmeans.fit(objectives_)
             closest, _ = pairwise_distances_argmin_min(kmeans.cluster_centers_, objectives_)
+            labels_kmeans = kmeans.labels_
+            print(labels_kmeans)
+
+            labelled_objectives = []
+            labelled_variables = []
+            for label_n in range(n_clusters):
+                labelled_objectives.append(objectives_[labels_kmeans == label_n])
+                labelled_variables.append(evolver.population.individuals[labels_kmeans == label_n])
+
             objectives = objectives_[closest]
             variables = evolver.population.individuals[closest]
+
+            ### DBSCAN
+            # dbscan = DBSCAN(eps=0.125, min_samples=3).fit(objectives_)
+            # core_samples_mask = np.zeros_like(dbscan.labels_, dtype=bool)
+            # core_samples_mask[dbscan.core_sample_indices_] = True
+            # labels_dbscan = dbscan.labels_
+            # n_clusters_dbscan = len(set(labels_dbscan)) - (1 if -1 in labels_dbscan else 0)
+
+            # print("n clusters:", n_clusters_dbscan)
+            # print(labels_dbscan)
+
+            ### Gaussian mixtures
+            # gmm = GaussianMixture(n_components=10, covariance_type="spherical").fit(objectives_)
+            # labels_gmm = gmm.predict(objectives_)
+
+            # print(labels_gmm)
+            # print(gmm.means_)
+            # print(gmm.covariances_)
+            # print(gmm.converged_)
+
+            # objectives = objectives_
+            # variables = evolver.population.individuals
 
             color_data = color_solutions(
                 objectives, ref_point=color_point, ideal=evolver.population.ideal_objective_vector,
@@ -135,12 +169,34 @@ while True:
                 .replace("\n", "")
                 .replace(" ", "")
             )
-            # d["DATA"] = np.array2string(obj_with_col_and_var, separator=",").replace("\n", "").replace(" ", "")
-            # d["DATA"] = np.array2string(objectives, separator=",").replace("\n", "").replace(" ", "")
-            print(d["DATA"])
 
+            for i in range(n_clusters):
+                color_data = color_solutions(
+                    labelled_objectives[i], ref_point=color_point, ideal=evolver.population.ideal_objective_vector,
+                )
+                obj_with_col_and_var = np.hstack(
+                    (
+                        labelled_objectives[i],
+                        color_data,
+                        labelled_variables[i],
+                        np.repeat(np.atleast_2d(n_iteration), len(labelled_objectives[i]), axis=0),
+                    )
+                )
+
+                d[f"{i}"] = (
+                    np.array2string(
+                        obj_with_col_and_var,
+                        separator=",",
+                        formatter={"all": lambda x: str(int(x)) if x.is_integer() else "{:.6f}".format(x)},
+                    )
+                    .replace("\n", "")
+                    .replace(" ", "")
+                )
+
+            # send response
             data = parse_dict(d).encode("utf-8")
 
+            # print(f"Data: {d['DATA']}")
             print(f"Sending data: {data}")
 
             connection.send(data)
